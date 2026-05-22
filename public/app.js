@@ -7,6 +7,10 @@ const screens = {
 };
 
 const packageGrid = document.querySelector("#package-grid");
+const fullscreenButton = document.querySelector("#fullscreen-button");
+const idleWarning = document.querySelector("#idle-warning");
+const idleWarningText = document.querySelector("#idle-warning-text");
+const stayButton = document.querySelector("#stay-button");
 const paymentStatus = document.querySelector("#payment-status");
 const qrFrame = document.querySelector("#qr-frame");
 const testLink = document.querySelector("#test-link");
@@ -21,6 +25,7 @@ const captureProgress = document.querySelector("#capture-progress");
 const capturePackage = document.querySelector("#capture-package");
 const captureTitle = document.querySelector("#capture-title");
 const sessionCopy = document.querySelector("#session-copy");
+const retryCameraButton = document.querySelector("#retry-camera-button");
 const thumbnailGrid = document.querySelector("#thumbnail-grid");
 const reviewCount = document.querySelector("#review-count");
 const reviewGrid = document.querySelector("#review-grid");
@@ -44,6 +49,19 @@ let retakeIndex = null;
 let isCapturing = false;
 let selectedTemplateId = "clean";
 let finalLayoutUrl = "";
+let currentScreen = "packages";
+let idleTimer = null;
+let idleWarningTimer = null;
+let idleCountdownTimer = null;
+let postSessionTimer = null;
+
+const idleTimeouts = {
+  packages: 0,
+  payment: 180000,
+  ready: 60000,
+  capture: 120000,
+  review: 120000
+};
 
 const printTemplates = [
   {
@@ -93,6 +111,7 @@ const printTemplates = [
 ];
 
 boot();
+installKioskListeners();
 
 async function boot() {
   const boothId = new URLSearchParams(window.location.search).get("boothId") || localStorage.getItem("boothId") || "";
@@ -138,6 +157,8 @@ function renderPackage(item) {
 }
 
 async function createOrder(packageId) {
+  clearPostSessionTimer();
+  sessionLaunching = false;
   showScreen("payment");
   setPaymentStatus("Creating secure QR payment...");
   setQrPlaceholder();
@@ -277,6 +298,7 @@ async function showCaptureScreen() {
   sessionCopy.textContent = "Camera first, masterpiece second.";
   beginCaptureButton.disabled = false;
   beginCaptureButton.textContent = "Start shoot";
+  retryCameraButton.classList.add("hidden");
   renderThumbnails();
   updateCaptureProgress();
   await startCamera();
@@ -302,10 +324,13 @@ async function startCamera() {
     cameraOverlay.classList.add("hidden");
     cameraStatus.textContent = "Ready";
     sessionCopy.textContent = "Tap start, then follow the countdown. Big energy encouraged.";
+    beginCaptureButton.disabled = false;
   } catch (error) {
     cameraStatus.textContent = "Blocked";
     cameraOverlay.textContent = "Allow camera access to start the session.";
     sessionCopy.textContent = "Camera permission is needed before the fun part can start.";
+    beginCaptureButton.disabled = true;
+    retryCameraButton.classList.remove("hidden");
   }
 }
 
@@ -418,6 +443,7 @@ function showReviewScreen() {
   renderStrip();
   renderReviewGrid();
   showScreen("review");
+  startPostSessionTimer();
 }
 
 function renderReviewGrid() {
@@ -796,6 +822,8 @@ function printStrip() {
 function resetSession() {
   stopPolling();
   stopCamera();
+  clearIdleTimers();
+  clearPostSessionTimer();
   window.clearTimeout(sessionLaunchTimer);
   sessionLaunching = false;
   activeOrder = null;
@@ -804,6 +832,7 @@ function resetSession() {
   finalLayoutUrl = "";
   selectedTemplateId = "clean";
   showScreen("packages");
+  startIdleTimer();
 }
 
 function stopCamera() {
@@ -823,6 +852,8 @@ function wait(ms) {
 function showScreen(name) {
   Object.values(screens).forEach((screen) => screen.classList.remove("active"));
   screens[name].classList.add("active");
+  currentScreen = name;
+  startIdleTimer();
 }
 
 function setPaymentStatus(message) {
@@ -838,6 +869,83 @@ function stopPolling() {
   pollTimer = null;
 }
 
+function installKioskListeners() {
+  ["pointerdown", "keydown", "touchstart"].forEach((eventName) => {
+    window.addEventListener(eventName, startIdleTimer, { passive: true });
+  });
+
+  window.addEventListener("beforeunload", (event) => {
+    if (activeOrder && currentScreen !== "packages" && currentScreen !== "review") {
+      event.preventDefault();
+      event.returnValue = "";
+    }
+  });
+}
+
+function startIdleTimer() {
+  clearIdleTimers();
+  const timeout = idleTimeouts[currentScreen] || 0;
+
+  if (!timeout || isCapturing) {
+    return;
+  }
+
+  idleWarningTimer = window.setTimeout(() => {
+    showIdleWarning(15);
+  }, Math.max(timeout - 15000, 1000));
+
+  idleTimer = window.setTimeout(() => {
+    resetSession();
+  }, timeout);
+}
+
+function showIdleWarning(seconds) {
+  let remaining = seconds;
+  idleWarning.classList.remove("hidden");
+  idleWarningText.textContent = `Resetting in ${remaining}s`;
+
+  idleCountdownTimer = window.setInterval(() => {
+    remaining -= 1;
+    idleWarningText.textContent = `Resetting in ${Math.max(remaining, 0)}s`;
+
+    if (remaining <= 0) {
+      window.clearInterval(idleCountdownTimer);
+    }
+  }, 1000);
+}
+
+function clearIdleTimers() {
+  window.clearTimeout(idleTimer);
+  window.clearTimeout(idleWarningTimer);
+  window.clearInterval(idleCountdownTimer);
+  idleWarning.classList.add("hidden");
+}
+
+function startPostSessionTimer() {
+  clearPostSessionTimer();
+  postSessionTimer = window.setTimeout(resetSession, 120000);
+}
+
+function clearPostSessionTimer() {
+  window.clearTimeout(postSessionTimer);
+  postSessionTimer = null;
+}
+
+async function enterFullscreen() {
+  try {
+    if (!document.fullscreenElement) {
+      await document.documentElement.requestFullscreen();
+      fullscreenButton.textContent = "Exit fullscreen";
+      return;
+    }
+
+    await document.exitFullscreen();
+    fullscreenButton.textContent = "Fullscreen";
+  } catch {
+    fullscreenButton.textContent = "Fullscreen unavailable";
+  }
+}
+
 function escapeHtml(value) {
   return String(value)
     .replaceAll("&", "&amp;")
@@ -848,7 +956,17 @@ function escapeHtml(value) {
 }
 
 backButton.addEventListener("click", () => {
+  if (activeOrder && currentScreen === "payment") {
+    const shouldLeave = window.confirm("Cancel this payment session and return to packages?");
+
+    if (!shouldLeave) {
+      return;
+    }
+  }
+
   stopPolling();
+  activeOrder = null;
+  sessionLaunching = false;
   showScreen("packages");
 });
 
@@ -863,6 +981,12 @@ beginCaptureButton.addEventListener("click", () => {
   }
 
   runPhotoSession();
+});
+retryCameraButton.addEventListener("click", startCamera);
+fullscreenButton.addEventListener("click", enterFullscreen);
+stayButton.addEventListener("click", () => {
+  idleWarning.classList.add("hidden");
+  startIdleTimer();
 });
 printButton.addEventListener("click", printStrip);
 downloadButton.addEventListener("click", downloadStrip);

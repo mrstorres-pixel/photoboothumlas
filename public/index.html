@@ -7,6 +7,11 @@
     <link rel="stylesheet" href="/styles.css">
   </head>
   <body>
+    <button class="fullscreen-button" id="fullscreen-button" type="button">Fullscreen</button>
+    <div class="idle-warning hidden" id="idle-warning">
+      <p id="idle-warning-text">Resetting soon...</p>
+      <button class="secondary-button" id="stay-button" type="button">Stay here</button>
+    </div>
     <main class="kiosk-shell">
       <section class="screen active" id="packages-screen" aria-labelledby="packages-title">
         <div class="topbar">
@@ -94,6 +99,7 @@
             <p class="session-copy" id="session-copy">Camera first, masterpiece second.</p>
             <div class="thumbnail-grid" id="thumbnail-grid"></div>
             <button class="primary-button" id="begin-capture-button" type="button">Start photos</button>
+            <button class="secondary-button hidden" id="retry-camera-button" type="button">Retry camera</button>
           </aside>
         </div>
       </section>
