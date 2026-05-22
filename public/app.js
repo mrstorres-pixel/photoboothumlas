@@ -26,6 +26,7 @@ const reviewCount = document.querySelector("#review-count");
 const reviewGrid = document.querySelector("#review-grid");
 const designGrid = document.querySelector("#design-grid");
 const stripCanvas = document.querySelector("#strip-canvas");
+const printButton = document.querySelector("#print-button");
 const downloadButton = document.querySelector("#download-button");
 const retakeButton = document.querySelector("#retake-button");
 
@@ -665,6 +666,80 @@ function downloadStrip() {
   link.click();
 }
 
+function printStrip() {
+  const dataUrl = stripCanvas.toDataURL("image/png");
+  const printWindow = window.open("", "photobooth-print", "width=900,height=1100");
+
+  if (!printWindow) {
+    window.print();
+    return;
+  }
+
+  printWindow.document.write(`
+    <!doctype html>
+    <html>
+      <head>
+        <title>Print Photobooth Layout</title>
+        <style>
+          @page {
+            size: auto;
+            margin: 0;
+          }
+
+          * {
+            box-sizing: border-box;
+          }
+
+          html,
+          body {
+            width: 100%;
+            min-height: 100%;
+            margin: 0;
+            background: #ffffff;
+          }
+
+          body {
+            display: grid;
+            place-items: center;
+          }
+
+          img {
+            display: block;
+            width: auto;
+            max-width: 100vw;
+            max-height: 100vh;
+          }
+
+          @media print {
+            html,
+            body {
+              width: 100%;
+              height: 100%;
+            }
+
+            img {
+              max-width: 100%;
+              max-height: 100%;
+              page-break-inside: avoid;
+            }
+          }
+        </style>
+      </head>
+      <body>
+        <img src="${dataUrl}" alt="Photobooth print layout">
+        <script>
+          const image = document.querySelector("img");
+          image.addEventListener("load", () => {
+            window.focus();
+            window.print();
+          });
+        <\/script>
+      </body>
+    </html>
+  `);
+  printWindow.document.close();
+}
+
 function resetSession() {
   stopPolling();
   stopCamera();
@@ -735,6 +810,7 @@ beginCaptureButton.addEventListener("click", () => {
 
   runPhotoSession();
 });
+printButton.addEventListener("click", printStrip);
 downloadButton.addEventListener("click", downloadStrip);
 retakeButton.addEventListener("click", () => {
   capturedPhotos = [];
