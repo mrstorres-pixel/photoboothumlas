@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Umlas Photobooth</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <main class="kiosk-shell">
+      <section class="screen active" id="packages-screen" aria-labelledby="packages-title">
+        <div class="topbar">
+          <div>
+            <p class="eyebrow" id="booth-location">Photobooth kiosk</p>
+            <h1 id="packages-title">Choose your session</h1>
+          </div>
+          <div class="status-pill" id="booth-status">Ready</div>
+        </div>
+
+        <div class="package-grid" id="package-grid"></div>
+      </section>
+
+      <section class="screen" id="payment-screen" aria-labelledby="payment-title">
+        <div class="topbar compact">
+          <button class="icon-button" id="back-button" type="button" aria-label="Go back">
+            <span aria-hidden="true">&larr;</span>
+          </button>
+          <div>
+            <p class="eyebrow">Secure QR Ph payment</p>
+            <h1 id="payment-title">Scan to pay</h1>
+          </div>
+        </div>
+
+        <div class="payment-layout">
+          <div class="qr-panel">
+            <div class="qr-frame" id="qr-frame">
+              <div class="qr-placeholder">QR</div>
+            </div>
+            <p class="payment-status" id="payment-status">Creating payment...</p>
+          </div>
+
+          <aside class="order-summary">
+            <p class="eyebrow">Selected package</p>
+            <h2 id="summary-name">Package</h2>
+            <p class="booth-line" id="summary-booth"></p>
+            <p id="summary-description"></p>
+            <dl>
+              <div>
+                <dt>Total</dt>
+                <dd id="summary-amount">PHP 0.00</dd>
+              </div>
+              <div>
+                <dt>Shots</dt>
+                <dd id="summary-shots">0</dd>
+              </div>
+              <div>
+                <dt>Prints</dt>
+                <dd id="summary-prints">0</dd>
+              </div>
+            </dl>
+            <a class="test-link hidden" id="test-link" href="#" target="_blank" rel="noreferrer">Open test simulator</a>
+          </aside>
+        </div>
+      </section>
+
+      <section class="screen" id="ready-screen" aria-labelledby="ready-title">
+        <div class="ready-panel">
+          <p class="eyebrow">Payment confirmed</p>
+          <h1 id="ready-title">Get ready</h1>
+          <div class="countdown" id="countdown">5</div>
+          <button class="primary-button" id="start-over-button" type="button">New session</button>
+        </div>
+      </section>
+    </main>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

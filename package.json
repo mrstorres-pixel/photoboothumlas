@@ -1,0 +1,14 @@
+{
+  "name": "photobooth-umlas-kiosk",
+  "version": "0.1.0",
+  "private": true,
+  "description": "PC photobooth kiosk prototype with PayMongo QR Ph payment flow.",
+  "scripts": {
+    "check": "node --check server.js && node --check public/app.js && node --check api/booth/config.js && node --check api/orders/index.js && node --check api/orders/[id].js && node --check api/paymongo/webhook.js",
+    "dev": "node server.js",
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
