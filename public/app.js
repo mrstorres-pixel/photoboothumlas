@@ -24,6 +24,7 @@ const sessionCopy = document.querySelector("#session-copy");
 const thumbnailGrid = document.querySelector("#thumbnail-grid");
 const reviewCount = document.querySelector("#review-count");
 const reviewGrid = document.querySelector("#review-grid");
+const designGrid = document.querySelector("#design-grid");
 const stripCanvas = document.querySelector("#strip-canvas");
 const downloadButton = document.querySelector("#download-button");
 const retakeButton = document.querySelector("#retake-button");
@@ -37,6 +38,54 @@ let cameraStream = null;
 let capturedPhotos = [];
 let retakeIndex = null;
 let isCapturing = false;
+let selectedTemplateId = "clean";
+
+const printTemplates = [
+  {
+    id: "clean",
+    name: "Clean Studio",
+    description: "White border, sharp type, gallery feel.",
+    bg: "#fffaf1",
+    ink: "#161616",
+    muted: "#5f5a52",
+    accent: "#111111",
+    secondary: "#d8d1c4",
+    preview: "linear-gradient(135deg, #fffaf1 0 66%, #111111 66% 72%, #fffaf1 72%)"
+  },
+  {
+    id: "botanical",
+    name: "Botanical",
+    description: "Soft green edges with leaf details.",
+    bg: "#f6f4e9",
+    ink: "#17352f",
+    muted: "#5c6d5f",
+    accent: "#0f766e",
+    secondary: "#b9d8c3",
+    preview: "linear-gradient(135deg, #f6f4e9 0 45%, #b9d8c3 45% 58%, #0f766e 58% 68%, #f6f4e9 68%)"
+  },
+  {
+    id: "pop",
+    name: "Pop Flash",
+    description: "Bold color blocks for parties.",
+    bg: "#fff7ed",
+    ink: "#171717",
+    muted: "#6b4b3f",
+    accent: "#e45a3c",
+    secondary: "#2563eb",
+    preview: "linear-gradient(135deg, #fff7ed 0 38%, #e45a3c 38% 55%, #2563eb 55% 72%, #fff7ed 72%)"
+  },
+  {
+    id: "noir",
+    name: "Noir",
+    description: "Black frame, premium event look.",
+    bg: "#111111",
+    ink: "#fffaf1",
+    muted: "#d8d1c4",
+    accent: "#fffaf1",
+    secondary: "#8c7b61",
+    preview: "linear-gradient(135deg, #111111 0 52%, #8c7b61 52% 62%, #fffaf1 62% 70%, #111111 70%)"
+  }
+];
 
 boot();
 
@@ -189,7 +238,28 @@ function launchPaidSession(delay = 0) {
 function showReadyScreen() {
   showScreen("ready");
   window.clearTimeout(sessionLaunchTimer);
-  setTimeout(showCaptureScreen, 700);
+  renderDesignOptions();
+}
+
+function renderDesignOptions() {
+  designGrid.innerHTML = printTemplates
+    .map(
+      (template) => `
+        <button class="design-card" type="button" data-template-id="${template.id}">
+          <span class="design-preview" style="background:${template.preview}"></span>
+          <span class="design-name">${escapeHtml(template.name)}</span>
+          <span class="design-description">${escapeHtml(template.description)}</span>
+        </button>
+      `
+    )
+    .join("");
+
+  designGrid.querySelectorAll("button").forEach((button) => {
+    button.addEventListener("click", () => {
+      selectedTemplateId = button.dataset.templateId;
+      showCaptureScreen();
+    });
+  });
 }
 
 async function showCaptureScreen() {
@@ -391,6 +461,7 @@ async function runRetakePhoto() {
 function renderStrip() {
   const context = stripCanvas.getContext("2d");
   const layout = getPrintLayout();
+  const template = getSelectedTemplate();
   stripCanvas.width = layout.width;
   stripCanvas.height = layout.height;
   const width = layout.width;
@@ -405,8 +476,8 @@ function renderStrip() {
   const photoWidth = (width - frame * 2 - gap * (columns - 1)) / columns;
   const photoHeight = (height - frame * 2 - header - footer - gap * (rows - 1)) / rows;
 
-  drawPrintBackground(context, layout);
-  drawPrintHeader(context, layout);
+  drawPrintBackground(context, layout, template);
+  drawPrintHeader(context, layout, template);
 
   let loaded = 0;
 
@@ -417,16 +488,20 @@ function renderStrip() {
       const row = Math.floor(index / columns);
       const x = frame + column * (photoWidth + gap);
       const y = frame + header + row * (photoHeight + gap);
-      drawPhotoSlot(context, image, x, y, photoWidth, photoHeight, layout);
+      drawPhotoSlot(context, image, x, y, photoWidth, photoHeight, layout, template);
       loaded += 1;
 
       if (loaded === photoCount) {
-        drawPrintFooter(context, layout);
+        drawPrintFooter(context, layout, template);
         reviewCount.textContent = `${photoCount} photos`;
       }
     };
     image.src = photo.src;
   });
+}
+
+function getSelectedTemplate() {
+  return printTemplates.find((template) => template.id === selectedTemplateId) || printTemplates[0];
 }
 
 function getPrintLayout() {
@@ -463,66 +538,103 @@ function getPrintLayout() {
   };
 }
 
-function drawPrintBackground(context, layout) {
-  context.fillStyle = layout.bg;
+function drawPrintBackground(context, layout, template) {
+  context.fillStyle = template.bg;
   context.fillRect(0, 0, layout.width, layout.height);
-  context.fillStyle = layout.accent;
-  context.fillRect(0, 0, layout.width, 18);
-  context.fillRect(0, layout.height - 18, layout.width, 18);
-  context.fillStyle = layout.coral;
-  context.fillRect(18, 0, 18, layout.height);
-  context.fillRect(layout.width - 36, 0, 18, layout.height);
 
-  context.save();
-  context.globalAlpha = 0.16;
-  for (let y = 70; y < layout.height; y += 110) {
-    for (let x = 56; x < layout.width; x += 150) {
-      context.fillStyle = (x + y) % 300 === 0 ? layout.coral : layout.accent;
-      context.beginPath();
-      context.arc(x, y, 11, 0, Math.PI * 2);
-      context.fill();
+  if (template.id === "clean") {
+    context.fillStyle = template.accent;
+    context.fillRect(layout.frame, layout.frame, layout.width - layout.frame * 2, 8);
+    context.fillStyle = template.secondary;
+    context.fillRect(layout.frame, layout.height - layout.frame - 8, layout.width - layout.frame * 2, 8);
+    return;
+  }
+
+  if (template.id === "botanical") {
+    drawLeafPattern(context, layout, template);
+    return;
+  }
+
+  if (template.id === "pop") {
+    context.fillStyle = template.accent;
+    context.fillRect(0, 0, layout.width, layout.frame * 0.7);
+    context.fillStyle = template.secondary;
+    context.fillRect(0, layout.height - layout.frame * 0.7, layout.width, layout.frame * 0.7);
+    context.fillStyle = template.accent;
+    context.globalAlpha = 0.14;
+    for (let x = -80; x < layout.width; x += 180) {
+      context.fillRect(x, layout.frame * 1.2, 86, layout.height - layout.frame * 2.4);
     }
+    context.globalAlpha = 1;
+    return;
+  }
+
+  context.fillStyle = "#050505";
+  context.fillRect(0, 0, layout.width, layout.height);
+  context.strokeStyle = template.secondary;
+  context.lineWidth = 10;
+  context.strokeRect(layout.frame * 0.65, layout.frame * 0.65, layout.width - layout.frame * 1.3, layout.height - layout.frame * 1.3);
+}
+
+function drawLeafPattern(context, layout, template) {
+  context.save();
+  context.globalAlpha = 0.22;
+  context.strokeStyle = template.secondary;
+  context.lineWidth = 5;
+  for (let y = 80; y < layout.height; y += 140) {
+    drawLeaf(context, layout.frame * 0.45, y, 28);
+    drawLeaf(context, layout.width - layout.frame * 0.45, y + 56, 28);
   }
   context.restore();
 }
 
-function drawPrintHeader(context, layout) {
-  context.fillStyle = "#171717";
+function drawLeaf(context, x, y, size) {
+  context.beginPath();
+  context.ellipse(x, y, size * 0.5, size, Math.PI / 4, 0, Math.PI * 2);
+  context.stroke();
+  context.beginPath();
+  context.moveTo(x, y - size * 0.7);
+  context.lineTo(x, y + size * 0.7);
+  context.stroke();
+}
+
+function drawPrintHeader(context, layout, template) {
+  context.fillStyle = template.ink;
   context.font = layout.pattern === "strip" ? "900 52px Segoe UI, Arial" : "900 58px Segoe UI, Arial";
   context.fillText(boothConfig?.displayName || "Photobooth", layout.frame, layout.frame + 56);
-  context.fillStyle = "#64605a";
+  context.fillStyle = template.muted;
   context.font = layout.pattern === "strip" ? "700 28px Segoe UI, Arial" : "700 32px Segoe UI, Arial";
   context.fillText(activeOrder?.packageName || "Session", layout.frame, layout.frame + 96);
 
-  context.fillStyle = layout.coral;
-  context.fillRect(layout.frame, layout.frame + 126, Math.min(220, layout.width - layout.frame * 2), 10);
+  context.fillStyle = template.secondary;
+  context.fillRect(layout.frame, layout.frame + 124, Math.min(220, layout.width - layout.frame * 2), 8);
 }
 
-function drawPhotoSlot(context, image, x, y, width, height, layout) {
+function drawPhotoSlot(context, image, x, y, width, height, layout, template) {
   const border = layout.pattern === "strip" ? 12 : 10;
   context.save();
-  context.fillStyle = "#ffffff";
+  context.fillStyle = template.id === "noir" ? "#fffaf1" : "#ffffff";
   roundRect(context, x - border, y - border, width + border * 2, height + border * 2, 18);
   context.fill();
-  context.shadowColor = "rgba(22, 18, 10, 0.24)";
-  context.shadowBlur = 18;
+  context.shadowColor = template.id === "noir" ? "rgba(0, 0, 0, 0.5)" : "rgba(22, 18, 10, 0.2)";
+  context.shadowBlur = 14;
   context.shadowOffsetY = 10;
   drawImageCover(context, image, x, y, width, height);
   context.shadowColor = "transparent";
-  context.strokeStyle = layout.accent;
-  context.lineWidth = 5;
+  context.strokeStyle = template.secondary;
+  context.lineWidth = template.id === "clean" ? 3 : 5;
   context.strokeRect(x, y, width, height);
   context.restore();
 }
 
-function drawPrintFooter(context, layout) {
+function drawPrintFooter(context, layout, template) {
   const y = layout.height - layout.frame - 34;
-  context.fillStyle = layout.accent;
+  context.fillStyle = template.ink;
   context.font = layout.pattern === "strip" ? "900 28px Segoe UI, Arial" : "900 30px Segoe UI, Arial";
   context.fillText(new Date().toLocaleDateString("en-PH"), layout.frame, y);
-  context.fillStyle = "#171717";
+  context.fillStyle = template.muted;
   context.textAlign = "right";
-  context.fillText("UMLAS", layout.width - layout.frame, y);
+  context.fillText(template.name.toUpperCase(), layout.width - layout.frame, y);
   context.textAlign = "left";
 }
 
@@ -561,6 +673,7 @@ function resetSession() {
   activeOrder = null;
   capturedPhotos = [];
   retakeIndex = null;
+  selectedTemplateId = "clean";
   showScreen("packages");
 }
 

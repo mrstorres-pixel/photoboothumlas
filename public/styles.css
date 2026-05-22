@@ -332,7 +332,7 @@ dd {
 .ready-panel {
   place-items: center;
   align-content: center;
-  gap: 18px;
+  gap: 22px;
   flex: 1;
   min-height: 70vh;
   padding: 32px;
@@ -348,22 +348,48 @@ dd {
   line-height: 1.35;
 }
 
-.pulse-loader {
+.design-grid {
   display: grid;
-  place-items: center;
-  width: min(30vw, 220px);
-  aspect-ratio: 1;
-  margin-top: 12px;
-  border: 10px solid rgba(15, 118, 110, 0.18);
-  border-top-color: var(--accent);
-  border-radius: 50%;
-  animation: spin 0.85s linear infinite;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  width: min(100%, 980px);
 }
 
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
+.design-card {
+  display: grid;
+  gap: 10px;
+  min-height: 260px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.design-card:focus-visible,
+.design-card:hover {
+  outline: 4px solid rgba(15, 118, 110, 0.22);
+}
+
+.design-preview {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+}
+
+.design-name {
+  font-size: 1.05rem;
+  font-weight: 900;
+}
+
+.design-description {
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1.3;
 }
 
 .capture-layout,
@@ -541,7 +567,8 @@ button:disabled {
   .package-grid,
   .payment-layout,
   .capture-layout,
-  .review-layout {
+  .review-layout,
+  .design-grid {
     grid-template-columns: 1fr;
   }
 
