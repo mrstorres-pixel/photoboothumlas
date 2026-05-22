@@ -23,6 +23,7 @@ const captureTitle = document.querySelector("#capture-title");
 const sessionCopy = document.querySelector("#session-copy");
 const thumbnailGrid = document.querySelector("#thumbnail-grid");
 const reviewCount = document.querySelector("#review-count");
+const reviewGrid = document.querySelector("#review-grid");
 const stripCanvas = document.querySelector("#strip-canvas");
 const downloadButton = document.querySelector("#download-button");
 const retakeButton = document.querySelector("#retake-button");
@@ -34,6 +35,7 @@ let sessionLaunchTimer = null;
 let sessionLaunching = false;
 let cameraStream = null;
 let capturedPhotos = [];
+let retakeIndex = null;
 let isCapturing = false;
 
 boot();
@@ -193,6 +195,7 @@ function showReadyScreen() {
 async function showCaptureScreen() {
   showScreen("capture");
   capturedPhotos = [];
+  retakeIndex = null;
   isCapturing = false;
   capturePackage.textContent = activeOrder?.packageName || "Photobooth";
   captureTitle.textContent = "Own the frame";
@@ -252,8 +255,7 @@ async function runPhotoSession() {
 
   isCapturing = false;
   stopCamera();
-  renderStrip();
-  showScreen("review");
+  showReviewScreen();
 }
 
 function runShotCountdown() {
@@ -290,7 +292,11 @@ function captureFrame() {
   context.translate(width, 0);
   context.scale(-1, 1);
   context.drawImage(cameraPreview, 0, 0, width, height);
-  return canvas.toDataURL("image/jpeg", 0.92);
+  return {
+    src: canvas.toDataURL("image/jpeg", 0.92),
+    width,
+    height
+  };
 }
 
 function renderThumbnails() {
@@ -300,7 +306,7 @@ function renderThumbnails() {
   thumbnailGrid.innerHTML = slots
     .map((photo, index) => {
       if (photo) {
-        return `<img src="${photo}" alt="Captured photo ${index + 1}">`;
+        return `<img src="${photo.src}" alt="Captured photo ${index + 1}">`;
       }
 
       return `<div class="thumb-placeholder">${index + 1}</div>`;
@@ -331,56 +337,213 @@ function flashStage() {
   setTimeout(() => document.body.classList.remove("flash"), 120);
 }
 
+function showReviewScreen() {
+  renderStrip();
+  renderReviewGrid();
+  showScreen("review");
+}
+
+function renderReviewGrid() {
+  reviewGrid.innerHTML = capturedPhotos
+    .map(
+      (photo, index) => `
+        <button class="review-thumb" type="button" data-index="${index}" aria-label="Retake photo ${index + 1}">
+          <img src="${photo.src}" alt="Photo ${index + 1}">
+          <span>Retake ${index + 1}</span>
+        </button>
+      `
+    )
+    .join("");
+
+  reviewGrid.querySelectorAll("button").forEach((button) => {
+    button.addEventListener("click", () => retakePhoto(Number(button.dataset.index)));
+  });
+}
+
+async function retakePhoto(index) {
+  retakeIndex = index;
+  captureTitle.textContent = `Retake ${index + 1}`;
+  sessionCopy.textContent = "One clean replacement, then we rebuild the strip.";
+  captureProgress.textContent = `Retaking shot ${index + 1}`;
+  showScreen("capture");
+  renderThumbnails();
+  beginCaptureButton.disabled = false;
+  beginCaptureButton.textContent = "Retake photo";
+  await startCamera();
+}
+
+async function runRetakePhoto() {
+  if (isCapturing || !cameraStream || retakeIndex === null) {
+    return;
+  }
+
+  isCapturing = true;
+  beginCaptureButton.disabled = true;
+  beginCaptureButton.textContent = "Shooting";
+  await runShotCountdown();
+  capturedPhotos[retakeIndex] = captureFrame();
+  retakeIndex = null;
+  isCapturing = false;
+  stopCamera();
+  showReviewScreen();
+}
+
 function renderStrip() {
   const context = stripCanvas.getContext("2d");
-  const width = stripCanvas.width;
-  const height = stripCanvas.height;
-  const padding = 70;
-  const titleHeight = 150;
-  const gap = 28;
+  const layout = getPrintLayout();
+  stripCanvas.width = layout.width;
+  stripCanvas.height = layout.height;
+  const width = layout.width;
+  const height = layout.height;
   const photoCount = capturedPhotos.length;
-  const photoHeight = (height - padding * 2 - titleHeight - gap * Math.max(photoCount - 1, 0) - 90) / photoCount;
-  const photoWidth = width - padding * 2;
+  const columns = layout.columns;
+  const rows = Math.ceil(photoCount / columns);
+  const frame = layout.frame;
+  const gap = layout.gap;
+  const header = layout.header;
+  const footer = layout.footer;
+  const photoWidth = (width - frame * 2 - gap * (columns - 1)) / columns;
+  const photoHeight = (height - frame * 2 - header - footer - gap * (rows - 1)) / rows;
 
-  context.fillStyle = "#fffaf1";
-  context.fillRect(0, 0, width, height);
-  context.fillStyle = "#171717";
-  context.font = "800 62px Segoe UI, Arial";
-  context.fillText(boothConfig?.displayName || "Photobooth", padding, 88);
-  context.fillStyle = "#64605a";
-  context.font = "500 34px Segoe UI, Arial";
-  context.fillText(activeOrder?.packageName || "Session", padding, 136);
+  drawPrintBackground(context, layout);
+  drawPrintHeader(context, layout);
 
   let loaded = 0;
 
   capturedPhotos.forEach((photo, index) => {
     const image = new Image();
     image.onload = () => {
-      const y = padding + titleHeight + index * (photoHeight + gap);
-      drawImageCover(context, image, padding, y, photoWidth, photoHeight);
-      context.strokeStyle = "#ded4c4";
-      context.lineWidth = 8;
-      context.strokeRect(padding, y, photoWidth, photoHeight);
+      const column = index % columns;
+      const row = Math.floor(index / columns);
+      const x = frame + column * (photoWidth + gap);
+      const y = frame + header + row * (photoHeight + gap);
+      drawPhotoSlot(context, image, x, y, photoWidth, photoHeight, layout);
       loaded += 1;
 
       if (loaded === photoCount) {
-        context.fillStyle = "#0f766e";
-        context.font = "800 34px Segoe UI, Arial";
-        context.fillText(new Date().toLocaleDateString("en-PH"), padding, height - 44);
+        drawPrintFooter(context, layout);
         reviewCount.textContent = `${photoCount} photos`;
       }
     };
-    image.src = photo;
+    image.src = photo.src;
   });
 }
 
+function getPrintLayout() {
+  const isClassic = Number(activeOrder?.shots || 0) <= 4;
+
+  if (isClassic) {
+    return {
+      width: 720,
+      height: 2160,
+      columns: 1,
+      frame: 48,
+      gap: 26,
+      header: 210,
+      footer: 170,
+      accent: "#0f766e",
+      coral: "#e45a3c",
+      bg: "#fff8ec",
+      pattern: "strip"
+    };
+  }
+
+  return {
+    width: 1800,
+    height: 1200,
+    columns: 3,
+    frame: 70,
+    gap: 28,
+    header: 150,
+    footer: 120,
+    accent: "#0f766e",
+    coral: "#e45a3c",
+    bg: "#fff8ec",
+    pattern: "grid"
+  };
+}
+
+function drawPrintBackground(context, layout) {
+  context.fillStyle = layout.bg;
+  context.fillRect(0, 0, layout.width, layout.height);
+  context.fillStyle = layout.accent;
+  context.fillRect(0, 0, layout.width, 18);
+  context.fillRect(0, layout.height - 18, layout.width, 18);
+  context.fillStyle = layout.coral;
+  context.fillRect(18, 0, 18, layout.height);
+  context.fillRect(layout.width - 36, 0, 18, layout.height);
+
+  context.save();
+  context.globalAlpha = 0.16;
+  for (let y = 70; y < layout.height; y += 110) {
+    for (let x = 56; x < layout.width; x += 150) {
+      context.fillStyle = (x + y) % 300 === 0 ? layout.coral : layout.accent;
+      context.beginPath();
+      context.arc(x, y, 11, 0, Math.PI * 2);
+      context.fill();
+    }
+  }
+  context.restore();
+}
+
+function drawPrintHeader(context, layout) {
+  context.fillStyle = "#171717";
+  context.font = layout.pattern === "strip" ? "900 52px Segoe UI, Arial" : "900 58px Segoe UI, Arial";
+  context.fillText(boothConfig?.displayName || "Photobooth", layout.frame, layout.frame + 56);
+  context.fillStyle = "#64605a";
+  context.font = layout.pattern === "strip" ? "700 28px Segoe UI, Arial" : "700 32px Segoe UI, Arial";
+  context.fillText(activeOrder?.packageName || "Session", layout.frame, layout.frame + 96);
+
+  context.fillStyle = layout.coral;
+  context.fillRect(layout.frame, layout.frame + 126, Math.min(220, layout.width - layout.frame * 2), 10);
+}
+
+function drawPhotoSlot(context, image, x, y, width, height, layout) {
+  const border = layout.pattern === "strip" ? 12 : 10;
+  context.save();
+  context.fillStyle = "#ffffff";
+  roundRect(context, x - border, y - border, width + border * 2, height + border * 2, 18);
+  context.fill();
+  context.shadowColor = "rgba(22, 18, 10, 0.24)";
+  context.shadowBlur = 18;
+  context.shadowOffsetY = 10;
+  drawImageCover(context, image, x, y, width, height);
+  context.shadowColor = "transparent";
+  context.strokeStyle = layout.accent;
+  context.lineWidth = 5;
+  context.strokeRect(x, y, width, height);
+  context.restore();
+}
+
+function drawPrintFooter(context, layout) {
+  const y = layout.height - layout.frame - 34;
+  context.fillStyle = layout.accent;
+  context.font = layout.pattern === "strip" ? "900 28px Segoe UI, Arial" : "900 30px Segoe UI, Arial";
+  context.fillText(new Date().toLocaleDateString("en-PH"), layout.frame, y);
+  context.fillStyle = "#171717";
+  context.textAlign = "right";
+  context.fillText("UMLAS", layout.width - layout.frame, y);
+  context.textAlign = "left";
+}
+
 function drawImageCover(context, image, x, y, width, height) {
+  const portraitBias = height > width ? 0.42 : 0.5;
   const scale = Math.max(width / image.width, height / image.height);
   const sourceWidth = width / scale;
   const sourceHeight = height / scale;
   const sourceX = (image.width - sourceWidth) / 2;
-  const sourceY = (image.height - sourceHeight) / 2;
+  const sourceY = Math.max(0, Math.min(image.height - sourceHeight, (image.height - sourceHeight) * portraitBias));
   context.drawImage(image, sourceX, sourceY, sourceWidth, sourceHeight, x, y, width, height);
+}
+
+function roundRect(context, x, y, width, height, radius) {
+  context.beginPath();
+  context.moveTo(x + radius, y);
+  context.arcTo(x + width, y, x + width, y + height, radius);
+  context.arcTo(x + width, y + height, x, y + height, radius);
+  context.arcTo(x, y + height, x, y, radius);
+  context.arcTo(x, y, x + width, y, radius);
+  context.closePath();
 }
 
 function downloadStrip() {
@@ -397,6 +560,7 @@ function resetSession() {
   sessionLaunching = false;
   activeOrder = null;
   capturedPhotos = [];
+  retakeIndex = null;
   showScreen("packages");
 }
 
@@ -450,7 +614,14 @@ startOverButton.addEventListener("click", () => {
   resetSession();
 });
 
-beginCaptureButton.addEventListener("click", runPhotoSession);
+beginCaptureButton.addEventListener("click", () => {
+  if (retakeIndex !== null) {
+    runRetakePhoto();
+    return;
+  }
+
+  runPhotoSession();
+});
 downloadButton.addEventListener("click", downloadStrip);
 retakeButton.addEventListener("click", () => {
   capturedPhotos = [];

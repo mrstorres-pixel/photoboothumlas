@@ -390,6 +390,41 @@ dd {
   transform: scaleX(-1);
 }
 
+.framing-guide {
+  position: absolute;
+  inset: 34px;
+  border: 2px solid rgba(255, 250, 241, 0.72);
+  border-radius: 8px;
+  pointer-events: none;
+}
+
+.face-guide {
+  position: absolute;
+  top: 12%;
+  left: 50%;
+  width: min(32vw, 320px);
+  aspect-ratio: 3 / 4;
+  border: 3px solid rgba(255, 250, 241, 0.72);
+  border-radius: 50%;
+  transform: translateX(-50%);
+}
+
+.frame-line {
+  position: absolute;
+  left: 16%;
+  width: 68%;
+  height: 2px;
+  background: rgba(255, 250, 241, 0.56);
+}
+
+.frame-line.top {
+  top: 32%;
+}
+
+.frame-line.bottom {
+  bottom: 16%;
+}
+
 .camera-overlay {
   position: absolute;
   inset: auto 28px 28px;
@@ -461,7 +496,7 @@ dd {
 }
 
 .photo-strip-wrap canvas {
-  width: min(100%, 480px);
+  width: min(100%, 560px);
   height: auto;
   border-radius: 8px;
   background: #ffffff;
@@ -478,6 +513,43 @@ dd {
 .action-stack {
   display: grid;
   gap: 12px;
+}
+
+.review-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.review-thumb {
+  position: relative;
+  overflow: hidden;
+  min-height: 120px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  cursor: pointer;
+}
+
+.review-thumb img {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+}
+
+.review-thumb span {
+  position: absolute;
+  inset: auto 8px 8px;
+  display: block;
+  padding: 7px 8px;
+  border-radius: 6px;
+  background: rgba(23, 23, 23, 0.76);
+  color: #ffffff;
+  font-size: 0.82rem;
+  font-weight: 900;
+  text-align: center;
 }
 
 .secondary-button {

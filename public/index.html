@@ -84,6 +84,11 @@
         <div class="capture-layout">
           <div class="camera-stage">
             <video id="camera-preview" autoplay playsinline muted></video>
+            <div class="framing-guide" aria-hidden="true">
+              <div class="face-guide"></div>
+              <div class="frame-line top"></div>
+              <div class="frame-line bottom"></div>
+            </div>
             <div class="shot-countdown hidden" id="shot-countdown">3</div>
             <div class="camera-overlay" id="camera-overlay">Starting camera...</div>
           </div>
@@ -116,6 +121,7 @@
             <p class="eyebrow">Output</p>
             <h2>That is the one</h2>
             <p class="review-copy">Your strip is ready. Save it now, or run it back while the camera is still warm.</p>
+            <div class="review-grid" id="review-grid"></div>
             <div class="action-stack">
               <button class="primary-button" id="download-button" type="button">Download layout</button>
               <button class="secondary-button" id="retake-button" type="button">Retake session</button>
