@@ -12,7 +12,6 @@ const qrFrame = document.querySelector("#qr-frame");
 const testLink = document.querySelector("#test-link");
 const backButton = document.querySelector("#back-button");
 const startOverButton = document.querySelector("#start-over-button");
-const countdown = document.querySelector("#countdown");
 const beginCaptureButton = document.querySelector("#begin-capture-button");
 const cameraPreview = document.querySelector("#camera-preview");
 const cameraOverlay = document.querySelector("#camera-overlay");
@@ -20,6 +19,8 @@ const cameraStatus = document.querySelector("#camera-status");
 const shotCountdown = document.querySelector("#shot-countdown");
 const captureProgress = document.querySelector("#capture-progress");
 const capturePackage = document.querySelector("#capture-package");
+const captureTitle = document.querySelector("#capture-title");
+const sessionCopy = document.querySelector("#session-copy");
 const thumbnailGrid = document.querySelector("#thumbnail-grid");
 const reviewCount = document.querySelector("#review-count");
 const stripCanvas = document.querySelector("#strip-canvas");
@@ -29,7 +30,6 @@ const retakeButton = document.querySelector("#retake-button");
 let activeOrder = null;
 let boothConfig = null;
 let pollTimer = null;
-let countdownTimer = null;
 let cameraStream = null;
 let capturedPhotos = [];
 let isCapturing = false;
@@ -174,24 +174,7 @@ function startPolling(orderId) {
 
 function showReadyScreen() {
   showScreen("ready");
-  startCountdown();
-}
-
-function startCountdown() {
-  window.clearInterval(countdownTimer);
-  let seconds = 5;
-  countdown.textContent = seconds;
-
-  countdownTimer = window.setInterval(() => {
-    seconds -= 1;
-    countdown.textContent = Math.max(seconds, 0);
-
-    if (seconds <= 0) {
-      window.clearInterval(countdownTimer);
-      countdown.textContent = "GO";
-      setTimeout(showCaptureScreen, 500);
-    }
-  }, 1000);
+  setTimeout(showCaptureScreen, 700);
 }
 
 async function showCaptureScreen() {
@@ -199,8 +182,10 @@ async function showCaptureScreen() {
   capturedPhotos = [];
   isCapturing = false;
   capturePackage.textContent = activeOrder?.packageName || "Photobooth";
+  captureTitle.textContent = "Own the frame";
+  sessionCopy.textContent = "Camera first, masterpiece second.";
   beginCaptureButton.disabled = false;
-  beginCaptureButton.textContent = "Start photos";
+  beginCaptureButton.textContent = "Start shoot";
   renderThumbnails();
   updateCaptureProgress();
   await startCamera();
@@ -209,7 +194,7 @@ async function showCaptureScreen() {
 async function startCamera() {
   cameraOverlay.textContent = "Starting camera...";
   cameraOverlay.classList.remove("hidden");
-  cameraStatus.textContent = "Camera";
+  cameraStatus.textContent = "Warming up";
 
   try {
     stopCamera();
@@ -225,9 +210,11 @@ async function startCamera() {
     await cameraPreview.play();
     cameraOverlay.classList.add("hidden");
     cameraStatus.textContent = "Ready";
+    sessionCopy.textContent = "Tap start, then follow the countdown. Big energy encouraged.";
   } catch (error) {
     cameraStatus.textContent = "Blocked";
     cameraOverlay.textContent = "Allow camera access to start the session.";
+    sessionCopy.textContent = "Camera permission is needed before the fun part can start.";
   }
 }
 
@@ -238,9 +225,11 @@ async function runPhotoSession() {
 
   isCapturing = true;
   beginCaptureButton.disabled = true;
+  beginCaptureButton.textContent = "Shooting";
 
   while (capturedPhotos.length < Number(activeOrder.shots)) {
     updateCaptureProgress();
+    updateShotPrompt();
     await runShotCountdown();
     capturedPhotos.push(captureFrame());
     renderThumbnails();
@@ -256,7 +245,7 @@ async function runPhotoSession() {
 
 function runShotCountdown() {
   return new Promise((resolve) => {
-    let seconds = 3;
+    let seconds = 4;
     shotCountdown.textContent = seconds;
     shotCountdown.classList.remove("hidden");
 
@@ -309,7 +298,19 @@ function renderThumbnails() {
 function updateCaptureProgress() {
   const total = Number(activeOrder?.shots || 0);
   const next = Math.min(capturedPhotos.length + 1, total);
-  captureProgress.textContent = `Shot ${next} of ${total}`;
+  captureProgress.textContent = capturedPhotos.length >= total ? "All shots captured" : `Shot ${next} of ${total}`;
+}
+
+function updateShotPrompt() {
+  const prompts = [
+    ["First look", "Set the tone. Relax your shoulders and look alive."],
+    ["Switch it up", "New pose, same confidence."],
+    ["Main character", "This is the one for the frame."],
+    ["Final spark", "Make the last shot loud."]
+  ];
+  const prompt = prompts[capturedPhotos.length % prompts.length];
+  captureTitle.textContent = prompt[0];
+  sessionCopy.textContent = prompt[1];
 }
 
 function flashStage() {
@@ -379,7 +380,6 @@ function downloadStrip() {
 function resetSession() {
   stopPolling();
   stopCamera();
-  window.clearInterval(countdownTimer);
   activeOrder = null;
   capturedPhotos = [];
   showScreen("packages");

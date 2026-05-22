@@ -339,18 +339,31 @@ dd {
   text-align: center;
 }
 
-.countdown {
+.ready-copy {
+  max-width: 560px;
+  margin: 0;
+  color: var(--muted);
+  font-size: clamp(1.1rem, 2vw, 1.5rem);
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.pulse-loader {
   display: grid;
   place-items: center;
-  width: min(34vw, 260px);
+  width: min(30vw, 220px);
   aspect-ratio: 1;
-  margin: 12px 0;
-  border: 8px solid var(--accent);
+  margin-top: 12px;
+  border: 10px solid rgba(15, 118, 110, 0.18);
+  border-top-color: var(--accent);
   border-radius: 50%;
-  color: var(--blue);
-  font-size: clamp(5rem, 12vw, 10rem);
-  font-weight: 900;
-  line-height: 1;
+  animation: spin 0.85s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .capture-layout,
@@ -408,6 +421,14 @@ dd {
   align-content: start;
   gap: 20px;
   padding: clamp(24px, 4vw, 44px);
+}
+
+.session-copy {
+  margin: 0;
+  color: var(--muted);
+  font-size: 1.08rem;
+  font-weight: 800;
+  line-height: 1.4;
 }
 
 .thumbnail-grid {
