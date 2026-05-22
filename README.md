@@ -52,9 +52,12 @@ For local webhook testing, expose the server using a tunnel such as ngrok or Clo
 1. Create a Supabase project.
 2. Open the Supabase SQL Editor.
 3. Run [supabase/schema.sql](supabase/schema.sql).
-4. Copy your project URL and service role key into Vercel environment variables.
+4. Run [supabase/002_print_storage.sql](supabase/002_print_storage.sql).
+5. Copy your project URL and service role key into Vercel environment variables.
 
 The service role key must stay server-side. Do not put it in frontend code.
+
+The print storage migration creates a public `photobooth-prints` bucket and adds final image fields to `orders`. The kiosk uploads the final layout there, then shows a customer QR code for downloading the digital copy.
 
 ## Deploy to Vercel
 

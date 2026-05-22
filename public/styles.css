@@ -501,6 +501,31 @@ dd {
   line-height: 1.45;
 }
 
+.digital-copy {
+  display: grid;
+  justify-items: start;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.digital-status {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+  font-weight: 900;
+}
+
+.download-qr {
+  width: 180px;
+  height: 180px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
 .action-stack {
   display: grid;
   gap: 12px;

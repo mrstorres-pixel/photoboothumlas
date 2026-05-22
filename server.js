@@ -27,6 +27,12 @@ const routes = [
   },
   {
     method: "POST",
+    pattern: /^\/api\/orders\/([^/]+)\/layout$/,
+    handler: require("./api/orders/[id]/layout"),
+    params: ["id"]
+  },
+  {
+    method: "POST",
     pattern: /^\/api\/paymongo\/webhook$/,
     handler: require("./api/paymongo/webhook")
   }

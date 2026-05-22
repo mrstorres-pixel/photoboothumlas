@@ -25,6 +25,9 @@ const thumbnailGrid = document.querySelector("#thumbnail-grid");
 const reviewCount = document.querySelector("#review-count");
 const reviewGrid = document.querySelector("#review-grid");
 const designGrid = document.querySelector("#design-grid");
+const digitalStatus = document.querySelector("#digital-status");
+const downloadQr = document.querySelector("#download-qr");
+const downloadLink = document.querySelector("#download-link");
 const stripCanvas = document.querySelector("#strip-canvas");
 const printButton = document.querySelector("#print-button");
 const downloadButton = document.querySelector("#download-button");
@@ -40,6 +43,7 @@ let capturedPhotos = [];
 let retakeIndex = null;
 let isCapturing = false;
 let selectedTemplateId = "clean";
+let finalLayoutUrl = "";
 
 const printTemplates = [
   {
@@ -409,6 +413,8 @@ function flashStage() {
 }
 
 function showReviewScreen() {
+  finalLayoutUrl = "";
+  resetDigitalCopyPanel();
   renderStrip();
   renderReviewGrid();
   showScreen("review");
@@ -495,10 +501,57 @@ function renderStrip() {
       if (loaded === photoCount) {
         drawPrintFooter(context, layout, template);
         reviewCount.textContent = `${photoCount} photos`;
+        saveFinalLayout();
       }
     };
     image.src = photo.src;
   });
+}
+
+async function saveFinalLayout() {
+  if (!activeOrder?.id) {
+    digitalStatus.textContent = "Digital copy unavailable for this session.";
+    return;
+  }
+
+  try {
+    digitalStatus.textContent = "Saving digital copy...";
+    const response = await fetch(`/api/orders/${activeOrder.id}/layout`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        dataUrl: stripCanvas.toDataURL("image/jpeg", 0.92)
+      })
+    });
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || "Unable to save layout.");
+    }
+
+    finalLayoutUrl = data.layout.url;
+    renderDigitalCopyPanel(finalLayoutUrl);
+  } catch (error) {
+    digitalStatus.textContent = "Digital copy could not be saved. Download still works on this kiosk.";
+  }
+}
+
+function renderDigitalCopyPanel(url) {
+  digitalStatus.textContent = "Scan to download";
+  downloadQr.src = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=10&data=${encodeURIComponent(url)}`;
+  downloadQr.classList.remove("hidden");
+  downloadLink.href = url;
+  downloadLink.classList.remove("hidden");
+}
+
+function resetDigitalCopyPanel() {
+  digitalStatus.textContent = "Preparing digital copy...";
+  downloadQr.removeAttribute("src");
+  downloadQr.classList.add("hidden");
+  downloadLink.href = "#";
+  downloadLink.classList.add("hidden");
 }
 
 function getSelectedTemplate() {
@@ -748,6 +801,7 @@ function resetSession() {
   activeOrder = null;
   capturedPhotos = [];
   retakeIndex = null;
+  finalLayoutUrl = "";
   selectedTemplateId = "clean";
   showScreen("packages");
 }
