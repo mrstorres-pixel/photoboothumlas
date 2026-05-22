@@ -1,7 +1,9 @@
 const screens = {
   packages: document.querySelector("#packages-screen"),
   payment: document.querySelector("#payment-screen"),
-  ready: document.querySelector("#ready-screen")
+  ready: document.querySelector("#ready-screen"),
+  capture: document.querySelector("#capture-screen"),
+  review: document.querySelector("#review-screen")
 };
 
 const packageGrid = document.querySelector("#package-grid");
@@ -11,11 +13,26 @@ const testLink = document.querySelector("#test-link");
 const backButton = document.querySelector("#back-button");
 const startOverButton = document.querySelector("#start-over-button");
 const countdown = document.querySelector("#countdown");
+const beginCaptureButton = document.querySelector("#begin-capture-button");
+const cameraPreview = document.querySelector("#camera-preview");
+const cameraOverlay = document.querySelector("#camera-overlay");
+const cameraStatus = document.querySelector("#camera-status");
+const shotCountdown = document.querySelector("#shot-countdown");
+const captureProgress = document.querySelector("#capture-progress");
+const capturePackage = document.querySelector("#capture-package");
+const thumbnailGrid = document.querySelector("#thumbnail-grid");
+const reviewCount = document.querySelector("#review-count");
+const stripCanvas = document.querySelector("#strip-canvas");
+const downloadButton = document.querySelector("#download-button");
+const retakeButton = document.querySelector("#retake-button");
 
 let activeOrder = null;
 let boothConfig = null;
 let pollTimer = null;
 let countdownTimer = null;
+let cameraStream = null;
+let capturedPhotos = [];
+let isCapturing = false;
 
 boot();
 
@@ -172,8 +189,214 @@ function startCountdown() {
     if (seconds <= 0) {
       window.clearInterval(countdownTimer);
       countdown.textContent = "GO";
+      setTimeout(showCaptureScreen, 500);
     }
   }, 1000);
+}
+
+async function showCaptureScreen() {
+  showScreen("capture");
+  capturedPhotos = [];
+  isCapturing = false;
+  capturePackage.textContent = activeOrder?.packageName || "Photobooth";
+  beginCaptureButton.disabled = false;
+  beginCaptureButton.textContent = "Start photos";
+  renderThumbnails();
+  updateCaptureProgress();
+  await startCamera();
+}
+
+async function startCamera() {
+  cameraOverlay.textContent = "Starting camera...";
+  cameraOverlay.classList.remove("hidden");
+  cameraStatus.textContent = "Camera";
+
+  try {
+    stopCamera();
+    cameraStream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        width: { ideal: 1920 },
+        height: { ideal: 1080 },
+        facingMode: "user"
+      },
+      audio: false
+    });
+    cameraPreview.srcObject = cameraStream;
+    await cameraPreview.play();
+    cameraOverlay.classList.add("hidden");
+    cameraStatus.textContent = "Ready";
+  } catch (error) {
+    cameraStatus.textContent = "Blocked";
+    cameraOverlay.textContent = "Allow camera access to start the session.";
+  }
+}
+
+async function runPhotoSession() {
+  if (isCapturing || !cameraStream) {
+    return;
+  }
+
+  isCapturing = true;
+  beginCaptureButton.disabled = true;
+
+  while (capturedPhotos.length < Number(activeOrder.shots)) {
+    updateCaptureProgress();
+    await runShotCountdown();
+    capturedPhotos.push(captureFrame());
+    renderThumbnails();
+    flashStage();
+    await wait(700);
+  }
+
+  isCapturing = false;
+  stopCamera();
+  renderStrip();
+  showScreen("review");
+}
+
+function runShotCountdown() {
+  return new Promise((resolve) => {
+    let seconds = 3;
+    shotCountdown.textContent = seconds;
+    shotCountdown.classList.remove("hidden");
+
+    const timer = window.setInterval(() => {
+      seconds -= 1;
+
+      if (seconds <= 0) {
+        window.clearInterval(timer);
+        shotCountdown.textContent = "SMILE";
+        setTimeout(() => {
+          shotCountdown.classList.add("hidden");
+          resolve();
+        }, 260);
+        return;
+      }
+
+      shotCountdown.textContent = seconds;
+    }, 900);
+  });
+}
+
+function captureFrame() {
+  const canvas = document.createElement("canvas");
+  const width = cameraPreview.videoWidth || 1280;
+  const height = cameraPreview.videoHeight || 720;
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d");
+  context.translate(width, 0);
+  context.scale(-1, 1);
+  context.drawImage(cameraPreview, 0, 0, width, height);
+  return canvas.toDataURL("image/jpeg", 0.92);
+}
+
+function renderThumbnails() {
+  const total = Number(activeOrder?.shots || 0);
+  const slots = Array.from({ length: total }, (_, index) => capturedPhotos[index] || "");
+
+  thumbnailGrid.innerHTML = slots
+    .map((photo, index) => {
+      if (photo) {
+        return `<img src="${photo}" alt="Captured photo ${index + 1}">`;
+      }
+
+      return `<div class="thumb-placeholder">${index + 1}</div>`;
+    })
+    .join("");
+}
+
+function updateCaptureProgress() {
+  const total = Number(activeOrder?.shots || 0);
+  const next = Math.min(capturedPhotos.length + 1, total);
+  captureProgress.textContent = `Shot ${next} of ${total}`;
+}
+
+function flashStage() {
+  document.body.classList.add("flash");
+  setTimeout(() => document.body.classList.remove("flash"), 120);
+}
+
+function renderStrip() {
+  const context = stripCanvas.getContext("2d");
+  const width = stripCanvas.width;
+  const height = stripCanvas.height;
+  const padding = 70;
+  const titleHeight = 150;
+  const gap = 28;
+  const photoCount = capturedPhotos.length;
+  const photoHeight = (height - padding * 2 - titleHeight - gap * Math.max(photoCount - 1, 0) - 90) / photoCount;
+  const photoWidth = width - padding * 2;
+
+  context.fillStyle = "#fffaf1";
+  context.fillRect(0, 0, width, height);
+  context.fillStyle = "#171717";
+  context.font = "800 62px Segoe UI, Arial";
+  context.fillText(boothConfig?.displayName || "Photobooth", padding, 88);
+  context.fillStyle = "#64605a";
+  context.font = "500 34px Segoe UI, Arial";
+  context.fillText(activeOrder?.packageName || "Session", padding, 136);
+
+  let loaded = 0;
+
+  capturedPhotos.forEach((photo, index) => {
+    const image = new Image();
+    image.onload = () => {
+      const y = padding + titleHeight + index * (photoHeight + gap);
+      drawImageCover(context, image, padding, y, photoWidth, photoHeight);
+      context.strokeStyle = "#ded4c4";
+      context.lineWidth = 8;
+      context.strokeRect(padding, y, photoWidth, photoHeight);
+      loaded += 1;
+
+      if (loaded === photoCount) {
+        context.fillStyle = "#0f766e";
+        context.font = "800 34px Segoe UI, Arial";
+        context.fillText(new Date().toLocaleDateString("en-PH"), padding, height - 44);
+        reviewCount.textContent = `${photoCount} photos`;
+      }
+    };
+    image.src = photo;
+  });
+}
+
+function drawImageCover(context, image, x, y, width, height) {
+  const scale = Math.max(width / image.width, height / image.height);
+  const sourceWidth = width / scale;
+  const sourceHeight = height / scale;
+  const sourceX = (image.width - sourceWidth) / 2;
+  const sourceY = (image.height - sourceHeight) / 2;
+  context.drawImage(image, sourceX, sourceY, sourceWidth, sourceHeight, x, y, width, height);
+}
+
+function downloadStrip() {
+  const link = document.createElement("a");
+  link.href = stripCanvas.toDataURL("image/png");
+  link.download = `photobooth-${Date.now()}.png`;
+  link.click();
+}
+
+function resetSession() {
+  stopPolling();
+  stopCamera();
+  window.clearInterval(countdownTimer);
+  activeOrder = null;
+  capturedPhotos = [];
+  showScreen("packages");
+}
+
+function stopCamera() {
+  if (!cameraStream) {
+    return;
+  }
+
+  cameraStream.getTracks().forEach((track) => track.stop());
+  cameraStream = null;
+  cameraPreview.srcObject = null;
+}
+
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function showScreen(name) {
@@ -209,8 +432,12 @@ backButton.addEventListener("click", () => {
 });
 
 startOverButton.addEventListener("click", () => {
-  stopPolling();
-  window.clearInterval(countdownTimer);
-  activeOrder = null;
-  showScreen("packages");
+  resetSession();
+});
+
+beginCaptureButton.addEventListener("click", runPhotoSession);
+downloadButton.addEventListener("click", downloadStrip);
+retakeButton.addEventListener("click", () => {
+  capturedPhotos = [];
+  showCaptureScreen();
 });
