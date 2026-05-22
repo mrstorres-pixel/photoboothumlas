@@ -30,6 +30,8 @@ const retakeButton = document.querySelector("#retake-button");
 let activeOrder = null;
 let boothConfig = null;
 let pollTimer = null;
+let sessionLaunchTimer = null;
+let sessionLaunching = false;
 let cameraStream = null;
 let capturedPhotos = [];
 let isCapturing = false;
@@ -105,7 +107,7 @@ async function createOrder(packageId) {
 
     if (activeOrder.status === "paid") {
       setPaymentStatus("Demo payment confirmed.");
-      setTimeout(showReadyScreen, 900);
+      launchPaidSession(900);
       return;
     }
 
@@ -153,9 +155,8 @@ function startPolling(orderId) {
     activeOrder = data.order;
 
     if (activeOrder.status === "paid") {
-      stopPolling();
       setPaymentStatus("Payment confirmed.");
-      showReadyScreen();
+      launchPaidSession();
       return;
     }
 
@@ -172,8 +173,20 @@ function startPolling(orderId) {
   }, 1800);
 }
 
+function launchPaidSession(delay = 0) {
+  if (sessionLaunching) {
+    return;
+  }
+
+  sessionLaunching = true;
+  stopPolling();
+  window.clearTimeout(sessionLaunchTimer);
+  sessionLaunchTimer = window.setTimeout(showReadyScreen, delay);
+}
+
 function showReadyScreen() {
   showScreen("ready");
+  window.clearTimeout(sessionLaunchTimer);
   setTimeout(showCaptureScreen, 700);
 }
 
@@ -380,6 +393,8 @@ function downloadStrip() {
 function resetSession() {
   stopPolling();
   stopCamera();
+  window.clearTimeout(sessionLaunchTimer);
+  sessionLaunching = false;
   activeOrder = null;
   capturedPhotos = [];
   showScreen("packages");
